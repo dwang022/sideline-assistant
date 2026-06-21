@@ -1,0 +1,5 @@
+node_modules
+dist
+.env
+.tmp_uploads
+.DS_Store
