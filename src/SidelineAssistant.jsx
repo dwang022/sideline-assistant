@@ -1685,8 +1685,8 @@ const CSS = `
 .sa-tick{width:5px;height:38px;background:#fff;border-radius:2px;
   box-shadow:0 0 14px rgba(255,255,255,.42)}
 .sa-brand h1{font-size:30px;font-weight:800;letter-spacing:3px;margin:0;line-height:.9;color:#fff}
-.sa-brand p{font-family:var(--body);font-size:12px;color:var(--mute);
-  margin:2px 0 0;letter-spacing:.3px}
+.sa-brand p{font-family:var(--body);font-size:10.5px;color:var(--mute);
+  margin:2px 0 0;letter-spacing:.1px;white-space:nowrap}
 .sa-mute{display:flex;align-items:center;gap:6px;background:transparent;
   border:1px solid var(--line);color:var(--mute);padding:7px 11px;border-radius:20px;
   font-family:var(--body);font-size:12px;cursor:pointer}
