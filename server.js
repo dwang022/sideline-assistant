@@ -4,6 +4,8 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import OpenAI, { toFile } from "openai";
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,6 +22,23 @@ const openai = new OpenAI({
 
 const PARSER_MODEL = process.env.OPENAI_PARSER_MODEL || "gpt-4o-mini";
 const TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-transcribe";
+
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+
+function transcodeToMp3(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .noVideo()
+      .audioCodec("libmp3lame")
+      .audioBitrate("96k")
+      .format("mp3")
+      .on("end", resolve)
+      .on("error", reject)
+      .save(outputPath);
+  });
+}
+
 
 const SITUATION_SCHEMA = {
   type: "object",
@@ -176,12 +195,11 @@ app.post("/api/transcribe-situation", upload.single("audio"), async (req, res) =
       return res.status(500).send("OPENAI_API_KEY is not set. Add it to .env.");
     }
 
-    const audioBuffer = await fs.promises.readFile(req.file.path);
-    const ext = audioExtFromMime(req.file.mimetype, req.file.originalname);
-    const audioFile = await toFile(audioBuffer, `sideline-audio.${ext}`);
+    const mp3Path = `${req.file.path}.mp3`;
+    await transcodeToMp3(req.file.path, mp3Path);
 
     const transcription = await openai.audio.transcriptions.create({
-      file: audioFile,
+      file: fs.createReadStream(mp3Path),
       model: TRANSCRIBE_MODEL,
       response_format: "json",
       prompt:
@@ -200,6 +218,7 @@ app.post("/api/transcribe-situation", upload.single("audio"), async (req, res) =
   } finally {
     if (req.file?.path) {
       fs.unlink(req.file.path, () => {});
+      fs.unlink(`${req.file.path}.mp3`, () => {});
     }
   }
 });
