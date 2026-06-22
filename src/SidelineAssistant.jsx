@@ -808,10 +808,25 @@ async function parseSituationWithAI(mode, transcript) {
   return res.json();
 }
 
+function getSpeechRecognition() {
+  if (typeof window === "undefined") return null;
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function audioFileNameFromBlob(audioBlob) {
+  const type = String(audioBlob?.type || "").toLowerCase();
+  if (type.includes("mp4")) return "sideline-call.mp4";
+  if (type.includes("mpeg") || type.includes("mp3")) return "sideline-call.mp3";
+  if (type.includes("wav")) return "sideline-call.wav";
+  if (type.includes("ogg")) return "sideline-call.ogg";
+  if (type.includes("webm")) return "sideline-call.webm";
+  return "sideline-call.webm";
+}
+
 async function parseAudioWithAI(mode, audioBlob) {
   const fd = new FormData();
   fd.append("mode", mode);
-  fd.append("audio", audioBlob, "sideline-call.webm");
+  fd.append("audio", audioBlob, audioFileNameFromBlob(audioBlob));
 
   const res = await fetch("/api/transcribe-situation", {
     method: "POST",
@@ -1172,13 +1187,16 @@ export default function SidelineAssistant() {
   const mediaRecorderRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
 
   useEffect(() => {
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    const hasBrowserSpeech = !!getSpeechRecognition();
+    const hasRecorderUpload = !!navigator.mediaDevices?.getUserMedia && !!window.MediaRecorder;
+    if (!hasBrowserSpeech && !hasRecorderUpload) {
       setSupported(false);
     }
   }, []);
@@ -1266,11 +1284,82 @@ export default function SidelineAssistant() {
     if (parsing) return;
 
     if (listening) {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch {}
+        return;
+      }
       try { mediaRecorderRef.current?.stop(); } catch {}
       setListening(false);
       return;
     }
 
+    const SpeechRecognition = getSpeechRecognition();
+
+    // Preferred phone path: use the browser/phone speech recognizer to create
+    // text, then send that text to the existing AI parser. This avoids mobile
+    // Safari audio blobs/codecs getting rejected by OpenAI transcription.
+    if (SpeechRecognition) {
+      try {
+        setTranscript("");
+        setResult(null);
+
+        const recognition = new SpeechRecognition();
+        recognitionRef.current = recognition;
+        recognition.lang = "en-US";
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        recognition.maxAlternatives = 1;
+
+        let finalText = "";
+        let latestText = "";
+        let alreadyHandled = false;
+
+        recognition.onstart = () => {
+          setListening(true);
+          setTranscript("Listening…");
+        };
+
+        recognition.onresult = (event) => {
+          let interimText = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const chunk = event.results[i]?.[0]?.transcript || "";
+            if (event.results[i].isFinal) finalText += `${chunk} `;
+            else interimText += chunk;
+          }
+          latestText = `${finalText} ${interimText}`.replace(/\s+/g, " ").trim();
+          if (latestText) setTranscript(latestText);
+        };
+
+        recognition.onerror = (event) => {
+          alreadyHandled = true;
+          console.error("Speech recognition error", event);
+          recognitionRef.current = null;
+          setListening(false);
+          setTranscript("Phone voice recognition failed. Tap the text box and use the keyboard mic, or type the situation.");
+        };
+
+        recognition.onend = () => {
+          recognitionRef.current = null;
+          setListening(false);
+          if (alreadyHandled) return;
+
+          const heard = (latestText || finalText || "").replace(/\s+/g, " ").trim();
+          if (heard) {
+            proposeFromText(heard);
+          } else {
+            setTranscript("No speech heard. Try again or type the situation.");
+          }
+        };
+
+        recognition.start();
+        return;
+      } catch (err) {
+        console.error(err);
+        // Fall through to recorder upload if browser speech recognition fails.
+      }
+    }
+
+    // Fallback path for browsers without SpeechRecognition.
     try {
       setTranscript("");
       setResult(null);
