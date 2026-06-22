@@ -1,16 +1,46 @@
-# React + Vite
+# CFB Sideline Assistant
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sideline Assistant is a football game-management decision tool built for fast sideline use. It helps coaches quickly apply decision charts for two-point conversions, penalty accept/decline situations, and late-half clock management.
 
-Currently, two official plugins are available:
+The app supports both AI-powered voice/text input and a fully manual input mode, so teams can still use the core chart logic even when Wi-Fi or cell service is unreliable.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+### Two-Point Conversion Decisions
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Sideline Assistant helps determine whether to go for two or kick the extra point based on:
 
-## Expanding the ESLint configuration
+- Score margin after the touchdown
+- Game/time bucket
+- Digitized PFF two-point conversion chart logic
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Coaches can use AI voice/text input, dropdowns, or the tappable chart grid.
+
+### Penalty Accept/Decline Decisions
+
+The penalty tool compares:
+
+- The accepted-penalty result
+- The actual play result if the penalty is declined
+- Whether the team is on offense or defense
+
+It then recommends whether to accept or decline the penalty based on the digitized penalty chart.
+
+### Clock Management
+
+The clock management tool estimates how much time the opponent would get back if the offense runs a normal clock-draining sequence. It helps coaches understand:
+
+- How constrained the opponent’s next possession would be
+- Whether one more first down is especially valuable
+- Whether the offense should prioritize conversion, clock burn, ball security, or avoiding free stoppages
+
+This feature is designed for late-half or late-game situations where the offense has the ball and wants to manage the remaining clock.
+
+### AI Input
+
+The app can take spoken or typed football situations and use OpenAI to extract structured game fields. The AI does not make the football decision. It only converts messy coach speech into clean inputs for the deterministic chart logic.
+
+Example:
+
+```text
+Up 6, 5:30 left in the fourth
