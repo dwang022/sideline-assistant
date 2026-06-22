@@ -54,13 +54,13 @@ const store = {
    Each cell is a recommendation code. Digitized from the PFF chart.
 --------------------------------------------------------------------------- */
 const TWO_PT_COLS = [
-  { key: "H1",   label: "1st Half" },
-  { key: "Q3",   label: "Q3" },
-  { key: "Q4_15", label: "Q4 15:00" },
-  { key: "Q4_10", label: "Q4 10:00" },
-  { key: "Q4_5",  label: "Q4 5:00" },
-  { key: "Q4_3",  label: "Q4 3:00" },
-  { key: "Q4_1",  label: "Q4 1:00" },
+  { key: "H1",    label: "1st Half", gridLabel: "H1",    manualLabel: "1st Half" },
+  { key: "Q3",    label: "Q3",       gridLabel: "Q3",    manualLabel: "Q3" },
+  { key: "Q4_15", label: "Q4 15:00", gridLabel: "15:00", manualLabel: "Q4 15:00 bucket (>10:00 left)" },
+  { key: "Q4_10", label: "Q4 10:00", gridLabel: "10:00", manualLabel: "Q4 10:00 bucket (5:01–10:00 left)" },
+  { key: "Q4_5",  label: "Q4 5:00",  gridLabel: "5:00",  manualLabel: "Q4 5:00 bucket (3:01–5:00 left)" },
+  { key: "Q4_3",  label: "Q4 3:00",  gridLabel: "3:00",  manualLabel: "Q4 3:00 bucket (1:01–3:00 left)" },
+  { key: "Q4_1",  label: "Q4 1:00",  gridLabel: "1:00",  manualLabel: "Q4 1:00 bucket (1:00 or less)" },
 ];
 
 // Differentials from +26 down to -26 (53 rows).
@@ -470,7 +470,7 @@ function answerTwoPoint(raw) {
   const row = TWO_PT_GRID[lookupDiff] || TWO_PT_GRID[lookupDiff > 0 ? 26 : -26];
   const code = String(row[colIdx]);
   const meta = REC_META[code] || REC_META["1"];
-  const colLabel = TWO_PT_COLS[colIdx].label;
+  const colLabel = TWO_PT_COLS[colIdx].manualLabel || TWO_PT_COLS[colIdx].label;
   const diffLabel =
     diff > 0 ? `up ${diff}` : diff < 0 ? `down ${Math.abs(diff)}` : "tied";
   return {
@@ -658,7 +658,7 @@ function answerTwoPointStructured(data = {}, sourceLabel = "AI parsed", rawText 
   const row = TWO_PT_GRID[lookupDiff] || TWO_PT_GRID[lookupDiff > 0 ? 26 : -26];
   const code = String(row[colIdx]);
   const meta = REC_META[code] || REC_META["1"];
-  const colLabel = TWO_PT_COLS[colIdx].label;
+  const colLabel = TWO_PT_COLS[colIdx].manualLabel || TWO_PT_COLS[colIdx].label;
   const diffLabel =
     diff > 0 ? `up ${diff}` : diff < 0 ? `down ${Math.abs(diff)}` : "tied";
 
@@ -931,7 +931,7 @@ function TwoPtGrid({ onPick }) {
       <div className="sa-grid sa-grid-2pt">
         <div className="sa-gh sa-gh-corner">DIFF</div>
         {TWO_PT_COLS.map((c) => (
-          <div key={c.key} className="sa-gh sa-gh-sm">{c.label.replace("Q4 ", "")}</div>
+          <div key={c.key} className="sa-gh sa-gh-sm">{c.gridLabel || c.label.replace("Q4 ", "")}</div>
         ))}
         {TWO_PT_DIFFS.map((d) => (
           <React.Fragment key={d}>
@@ -944,7 +944,7 @@ function TwoPtGrid({ onPick }) {
                   className="sa-cell sa-cell-sm"
                   style={{ background: TWO_PT_SWATCH[code] }}
                   onClick={() => onPick(d, c.key)}
-                  title={`${d > 0 ? "+" + d : d}, ${c.label}`}
+                  title={`${d > 0 ? "+" + d : d}, ${c.manualLabel || c.label}`}
                 />
               );
             })}
@@ -959,7 +959,7 @@ function TwoPtGrid({ onPick }) {
         <span><i style={{ background: "#b3261e" }} />Kick</span>
       </div>
       <p className="sa-grid-note">
-        Row = your lead after the TD, before the PAT. Tap a cell for the call.
+        Row = your lead after the TD, before the PAT. Q4 labels are bucket cutoffs; for example, 3:01–5:00 uses the 5:00 column.
       </p>
     </div>
   );
@@ -991,7 +991,7 @@ function answerTwoPointManual(diff, colKey) {
   const code = String(TWO_PT_GRID[lookupDiff][safeColIdx]);
   const meta = REC_META[code] || REC_META["1"];
   const diffLabel = lookupDiff > 0 ? `up ${lookupDiff}` : lookupDiff < 0 ? `down ${Math.abs(lookupDiff)}` : "tied";
-  const colLabel = TWO_PT_COLS[safeColIdx].label;
+  const colLabel = TWO_PT_COLS[safeColIdx].manualLabel || TWO_PT_COLS[safeColIdx].label;
 
   return {
     kind: "twopoint",
@@ -1055,8 +1055,9 @@ function ManualPanel({
           <label>
             Time bucket
             <select value={manualTwoCol} onChange={(e) => setManualTwoCol(e.target.value)}>
-              {TWO_PT_COLS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+              {TWO_PT_COLS.map((c) => <option key={c.key} value={c.key}>{c.manualLabel || c.label}</option>)}
             </select>
+            <span className="sa-help-text">Use the bucket whose range contains the current game clock.</span>
           </label>
         </div>
         <button className="sa-manual-submit" onClick={runManualTwoPoint} type="button">Get two-point call</button>
@@ -1809,7 +1810,7 @@ const CSS = `
 .sa-manual-grid.two{grid-template-columns:1fr 1fr}
 .sa-manual-grid.clock{grid-template-columns:1fr 1fr}
 .sa-manual-grid.penalty-box{grid-template-columns:1fr 1fr;margin-bottom:0}
-.sa-manual-grid label{font-family:var(--body);font-size:12px;color:var(--mute);display:flex;flex-direction:column;gap:5px}
+.sa-manual-grid label{font-family:var(--body);font-size:12px;color:var(--mute);display:flex;flex-direction:column;gap:5px}\n.sa-help-text{font-size:10.5px;line-height:1.25;color:rgba(255,255,255,.58);margin-top:-1px}
 .sa-manual-grid select{width:100%;background:#0a1c12;border:1px solid var(--line);border-radius:12px;
   color:var(--chalk);padding:12px 12px;font-family:var(--body);font-size:14px;outline:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)}
 .sa-manual-grid select:focus{border-color:var(--amber)}
